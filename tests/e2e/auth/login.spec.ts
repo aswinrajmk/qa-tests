@@ -1,6 +1,6 @@
 import { DEMO_USER, expect, test } from "../../../src/fixtures/index.ts";
 
-test.describe("Sign in", () => {
+test.describe("Sign in", { tag: "@REQ-1" }, () => {
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.goto();
   });

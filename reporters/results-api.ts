@@ -19,6 +19,7 @@ import type {
 //   RESULTS_API_URL     defaults to https://portfolio.aswin-qa.workers.dev
 //   QA_TRIGGER          "deploy" or "manual" (default "manual")
 //   APP_COMMIT_SHA, APP_COMMIT_MESSAGE, CI_RUN_URL   optional context shown in the report
+//   QA_FILTER           the --grep pattern when only part of the suite runs (shown on the report)
 
 type Status = "passed" | "failed" | "healed" | "skipped";
 
@@ -31,6 +32,7 @@ interface Payload {
   steps?: { title: string; durationMs: number; failed?: boolean }[];
   healing?: { element: string; broken: string; used: string; suggestion: string };
   logs?: string[];
+  tags?: string[];
   screenshot?: string;
 }
 
@@ -69,6 +71,7 @@ export default class ResultsApiReporter implements Reporter {
       commitSha: process.env.APP_COMMIT_SHA || undefined,
       commitMessage: clean(process.env.APP_COMMIT_MESSAGE, 300).trim() || undefined,
       ciRunUrl: process.env.CI_RUN_URL || undefined,
+      filter: process.env.QA_FILTER?.trim() || undefined,
     }).then((body) => {
       if (body?.id) console.log(`[results-api] Live report: ${this.baseUrl}/dashboard/run/?id=${body.id}`);
       return body?.id ?? null;
@@ -136,6 +139,8 @@ export default class ResultsApiReporter implements Reporter {
       steps: flattenSteps(result.steps).slice(0, 100),
       healing: status === "healed" ? healing : undefined,
       logs: logs.length ? logs : undefined,
+      // Requirement tags (@REQ-n) link the result to a requirement on the dashboard.
+      tags: test.tags.length ? test.tags.slice(0, 20) : undefined,
       screenshot,
     };
   }

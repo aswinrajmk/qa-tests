@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { DEMO_USER } from "../../src/fixtures/index.ts";
 
-test.describe("Holdings API", () => {
+test.describe("Holdings API", { tag: "@REQ-4" }, () => {
   test("rejects requests without a session", async ({ request }) => {
     const response = await request.get("/api/holdings");
     expect(response.status()).toBe(401);

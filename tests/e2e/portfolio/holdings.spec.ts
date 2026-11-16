@@ -1,7 +1,7 @@
 import { expect, test } from "../../../src/fixtures/index.ts";
 import { parseGbp } from "../../../src/pages/PortfolioPage.ts";
 
-test.describe("Portfolio", () => {
+test.describe("Portfolio", { tag: "@REQ-3" }, () => {
   test("shows the signed-in user's five holdings", async ({ signedIn }) => {
     await expect(signedIn.holdingsTable()).toBeVisible();
     await expect(signedIn.rows()).toHaveCount(5);

@@ -30,6 +30,37 @@ wealth app with synthetic data. Every WealthLite deploy triggers this suite, and
    - everything else passes
 4. Change the label back and push to return to green.
 
+## Requirements drive the tests
+
+Each WealthLite requirement is a GitHub issue with the `requirement` label and Given/When/Then acceptance
+criteria. Tests carry the issue number as a tag, for example `@REQ-3`, and the dashboard's
+[requirements coverage](https://portfolio.aswin-qa.workers.dev/dashboard/#requirements) matrix shows each
+requirement with its linked tests and their latest result.
+
+When the owner opens or edits a requirement issue, WealthLite sends a `requirement-changed` event here and
+[`requirement.yml`](.github/workflows/requirement.yml) runs:
+
+1. Claude Code reads the requirement and drafts (or updates) tests tagged `@REQ-<issue>`, following the
+   existing page objects and fixtures.
+2. The workflow runs lint, type-check and those tests against live WealthLite. Drafts never report to the
+   public dashboard.
+3. It opens a pull request (or updates the open one) and messages the owner on Telegram with the
+   pass/fail counts. Failing tests are expected when the app does not have the behaviour yet.
+4. After merge, every QA run reports the new tests, so the matrix moves from failing to passing once
+   WealthLite implements the requirement.
+
+Only open issues written and labelled by the owner are used, because their text goes to an AI agent.
+
+## Run part of the suite
+
+```sh
+npx playwright test --grep @REQ-1       # one requirement
+npx playwright test --grep login        # by title
+```
+
+In CI, the QA suite workflow takes the same pattern as its `grep` input. From Telegram, `/run @REQ-1`
+(or "run the tests for requirement 1") starts it after a YES.
+
 ## Run locally
 
 ```sh
@@ -44,6 +75,9 @@ Results go to the dashboard only when `RESULTS_API_TOKEN` is set. Without it, th
 
 ## Secrets (GitHub)
 
-| Name                | Purpose                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------ |
-| `RESULTS_API_TOKEN` | Bearer token for the portfolio Results API (same value as the portfolio repo secret) |
+| Name                                             | Purpose                                                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `RESULTS_API_TOKEN`                              | Bearer token for the portfolio Results API (same value as the portfolio repo secret) |
+| `BOT_GITHUB_TOKEN`                               | Fine-grained PAT used to push bot branches and open PRs (so PR checks run)           |
+| `BOT_EVENTS_TOKEN`                               | Bearer token for reporting back to the Telegram bot                                  |
+| `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` | Pays for Claude Code in the change and requirement workflows                         |
