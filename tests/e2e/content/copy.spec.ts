@@ -3,7 +3,7 @@ import { expect, test } from "../../../src/fixtures/index.ts";
 
 // Copy checks assert exact text on purpose. A renamed button heals in the flow tests,
 // but this test still fails, so a copy change is always reported.
-test.describe("Login page content", () => {
+test.describe("Login page content", { tag: "@REQ-1" }, () => {
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.goto();
   });
