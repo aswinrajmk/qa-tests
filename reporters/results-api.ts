@@ -67,7 +67,7 @@ export default class ResultsApiReporter implements Reporter {
       trigger: process.env.QA_TRIGGER === "deploy" ? "deploy" : "manual",
       targetUrl,
       commitSha: process.env.APP_COMMIT_SHA || undefined,
-      commitMessage: clean(process.env.APP_COMMIT_MESSAGE, 300) || undefined,
+      commitMessage: clean(process.env.APP_COMMIT_MESSAGE, 300).trim() || undefined,
       ciRunUrl: process.env.CI_RUN_URL || undefined,
     }).then((body) => {
       if (body?.id) console.log(`[results-api] Live report: ${this.baseUrl}/dashboard/run/?id=${body.id}`);

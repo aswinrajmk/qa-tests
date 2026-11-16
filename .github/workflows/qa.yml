@@ -54,8 +54,7 @@ jobs:
             echo "QA_TRIGGER=$trigger"
             echo "APP_COMMIT_SHA=$sha"
             echo "APP_COMMIT_MESSAGE<<__EOF__"
-            printf '%s\n' "$message" | head -c 300
-            echo
+            printf '%s\n' "${message:0:300}"
             echo "__EOF__"
           } >> "$GITHUB_ENV"
           echo "Testing $BASE_URL at ${sha::7} ($trigger)" >> "$GITHUB_STEP_SUMMARY"
