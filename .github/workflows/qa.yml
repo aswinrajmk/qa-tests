@@ -35,7 +35,9 @@ jobs:
     steps:
       - name: Validate the filter
         run: |
-          if ! printf '%s' "$QA_FILTER" | grep -Eq '^[A-Za-z0-9_@ .|()-]{0,80}$'; then
+          # Empty is allowed (whole suite). A bash regex, because grep sees no line at all for empty input.
+          allowed='^[A-Za-z0-9_@ .|()-]{0,80}$'
+          if ! [[ "$QA_FILTER" =~ $allowed ]]; then
             echo "The filter may only contain letters, digits, spaces and @ _ . | ( ) -"; exit 1
           fi
 
