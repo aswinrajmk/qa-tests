@@ -1,0 +1,82 @@
+name: QA suite
+
+on:
+  # Sent by wealthlite after every deploy to main.
+  repository_dispatch:
+    types: [wealthlite-deployed]
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: App URL to test
+        required: false
+        default: https://wealthlite.aswin-qa.workers.dev
+
+# Runs queue instead of cancelling each other, so every deploy gets a report.
+concurrency:
+  group: qa-suite
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: ${{ github.event.client_payload.url || inputs.base_url || 'https://wealthlite.aswin-qa.workers.dev' }}
+      RESULTS_API_TOKEN: ${{ secrets.RESULTS_API_TOKEN }}
+      CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Describe what is being tested
+        env:
+          EVENT: ${{ github.event_name }}
+          PAYLOAD_SHA: ${{ github.event.client_payload.sha }}
+          PAYLOAD_MESSAGE: ${{ github.event.client_payload.message }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$EVENT" = "repository_dispatch" ]; then
+            sha="$PAYLOAD_SHA"; message="$PAYLOAD_MESSAGE"; trigger=deploy
+          else
+            # Manual run: report against the latest wealthlite commit on main.
+            sha=$(gh api repos/aswinrajmk/wealthlite/commits/main --jq .sha)
+            message=$(gh api repos/aswinrajmk/wealthlite/commits/main --jq '.commit.message' | head -n 1)
+            trigger=manual
+          fi
+          {
+            echo "QA_TRIGGER=$trigger"
+            echo "APP_COMMIT_SHA=$sha"
+            echo "APP_COMMIT_MESSAGE<<__EOF__"
+            printf '%s\n' "$message" | head -c 300
+            echo
+            echo "__EOF__"
+          } >> "$GITHUB_ENV"
+          echo "Testing $BASE_URL at ${sha::7} ($trigger)" >> "$GITHUB_STEP_SUMMARY"
+
+      - run: npm run test:unit
+      - run: npx playwright install --with-deps chromium
+
+      - name: Wait for the app to respond
+        run: |
+          for i in $(seq 1 24); do
+            curl -fsS -o /dev/null "$BASE_URL/api/health" && exit 0
+            sleep 5
+          done
+          echo "No response from $BASE_URL" && exit 1
+
+      - name: Run the suite (streams results to the QA dashboard)
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
