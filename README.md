@@ -77,6 +77,13 @@ Results go to the dashboard only when `RESULTS_API_TOKEN` is set. Without it, th
 
 Only labelled Test issues are automated. A story's tests go into one spec and one PR.
 
+When you approve in Telegram, you also choose who writes the spec:
+
+- **✅ Claude:** Claude Code works in the repo, reuses the page objects and runs the checks itself.
+- **🏠 Local:** the local model on your Mac (Ollama) drafts the spec in one pass, and n8n sends it here. It goes
+  through the same checks. If they fail, the PR opens as a draft for you to fix. Use this when no Claude
+  subscription is available.
+
 ## The self-healing demo
 
 1. In WealthLite, change `SIGN_IN_LABEL` in `src/LoginPage.tsx` from `"Sign in"` to `"Log in"` and push.
