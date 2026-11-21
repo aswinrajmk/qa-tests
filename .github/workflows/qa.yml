@@ -22,6 +22,10 @@ on:
       base_url:
         type: string
         default: https://wealthlite.aswin-qa.workers.dev
+      suite:
+        description: smoke or regression. When set, the report is published to GitHub Pages and emailed.
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       base_url:
@@ -39,6 +43,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Write access only to push the HTML report to the gh-pages branch.
+    permissions:
+      contents: write
     # Runs queue instead of cancelling each other, so every deploy gets a report. Job level, so it also
     # applies when smoke.yml or regression.yml call this workflow.
     concurrency:
@@ -111,3 +118,78 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+
+      - name: Publish the HTML report to GitHub Pages
+        id: publish
+        if: ${{ !cancelled() && inputs.suite != '' && hashFiles('playwright-report/index.html') != '' }}
+        env:
+          SUITE: ${{ inputs.suite }}
+          FOLDER: ${{ github.run_id }}-${{ github.run_attempt }}
+          KEEP: 30
+        run: |
+          # One folder per run under reports/, the newest $KEEP kept, plus an index page. Runs never overlap
+          # (the qa-suite concurrency group), so pushes cannot race.
+          git config --global user.name "aswin-qa-bot"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          url="https://github-actions:${{ github.token }}@github.com/${{ github.repository }}.git"
+          if git ls-remote --exit-code --heads "$url" gh-pages >/dev/null; then
+            git clone -q --depth 1 --branch gh-pages "$url" pages
+          else
+            git init -q -b gh-pages pages && git -C pages remote add origin "$url"
+          fi
+          mkdir -p pages/reports && touch pages/.nojekyll
+          cp -r playwright-report "pages/reports/$FOLDER"
+          verdict=passed; node -e 'const r=require("./test-results/results.json");process.exit(r.stats.unexpected?1:0)' || verdict=failed
+          printf '%s|%s|%s\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "$SUITE" "$verdict" > "pages/reports/$FOLDER/run.txt"
+          cd pages/reports
+          ls -1d */ | sed 's#/##' | sort -t- -k1,1nr | tail -n +$((KEEP + 1)) | xargs -r rm -rf
+          {
+            echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            echo '<title>qa-tests reports</title><body style="font-family:system-ui,sans-serif;max-width:720px;margin:24px auto;padding:0 16px">'
+            echo '<h1>qa-tests: Playwright reports</h1><p>WealthLite smoke (every deploy) and regression (nightly) runs. Newest first.</p><ul>'
+            for d in $(ls -1d */ | sed 's#/##' | sort -t- -k1,1nr); do
+              IFS='|' read -r when suite result < "$d/run.txt" || continue
+              icon="✅"; [ "$result" = failed ] && icon="❌"
+              echo "<li>$icon <a href=\"$d/\">$when · $suite · $result</a></li>"
+            done
+            echo '</ul></body>'
+          } > index.html
+          cd ../..
+          git -C pages add -A && git -C pages commit -q -m "Report $FOLDER ($SUITE)" && git -C pages push -q origin gh-pages
+          echo "url=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/reports/$FOLDER/" >> "$GITHUB_OUTPUT"
+
+      - name: Build the run email
+        id: email
+        if: ${{ !cancelled() && inputs.suite != '' && hashFiles('test-results/results.json') != '' }}
+        env:
+          SUITE: ${{ inputs.suite }}
+          REPORT_URL: ${{ steps.publish.outputs.url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
+        run: node scripts/report/email-summary.ts test-results/results.json "$RUNNER_TEMP/email.html"
+
+      - name: Email the report
+        if: ${{ !cancelled() && steps.email.outputs.subject != '' }}
+        env:
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_APP_PASSWORD: ${{ secrets.MAIL_APP_PASSWORD }}
+        run: |
+          # Mail must never break CI: without the secrets it only warns.
+          if [ -z "$MAIL_USERNAME" ] || [ -z "$MAIL_APP_PASSWORD" ]; then
+            echo "::warning::MAIL_USERNAME or MAIL_APP_PASSWORD is not set, so the report was not emailed."
+            exit 0
+          fi
+          echo "send=true" >> "$GITHUB_ENV"
+
+      - name: Send via Gmail
+        if: ${{ !cancelled() && env.send == 'true' }}
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v24
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_APP_PASSWORD }}
+          from: qa-tests CI <${{ secrets.MAIL_USERNAME }}>
+          to: ${{ secrets.MAIL_USERNAME }}
+          subject: ${{ steps.email.outputs.subject }}
+          html_body: file://${{ runner.temp }}/email.html
