@@ -1,19 +1,13 @@
-import type { Locator, Page } from "@playwright/test";
-import type { Healer } from "../healing/heal.ts";
+import type { Locator } from "@playwright/test";
+import { BasePage } from "../core/BasePage.ts";
 
-export class LoginPage {
-  constructor(
-    readonly page: Page,
-    private readonly heal: Healer,
-  ) {}
+export class LoginPage extends BasePage {
+  protected readonly path = "/login";
 
+  readonly heading = () => this.page.getByRole("heading", { level: 1 });
   readonly email = () => this.page.getByLabel("Email");
   readonly password = () => this.page.getByLabel("Password");
   readonly error = () => this.page.getByRole("alert");
-
-  async goto() {
-    await this.page.goto("/login");
-  }
 
   /** The submit button, found through the healer so a label change does not break the flow. */
   submitButton(): Promise<Locator> {
@@ -31,7 +25,7 @@ export class LoginPage {
     });
   }
 
-  async signIn(email: string, password: string) {
+  async signIn(email: string, password: string): Promise<void> {
     await this.email().fill(email);
     await this.password().fill(password);
     await (await this.submitButton()).click();

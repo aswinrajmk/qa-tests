@@ -30,6 +30,8 @@ jobs:
       REQUEST_ID: ${{ inputs.request_id }}
       INSTRUCTION: ${{ inputs.instruction }}
       BOT_URL: https://portfolio.aswin-qa.workers.dev
+      # The bot commits in CI; local git hooks (lint-staged, commitlint) are for people, not for it.
+      HUSKY: "0"
     steps:
       - name: Validate the request id
         run: printf '%s' "$REQUEST_ID" | grep -Eq '^[a-f0-9]{12}$' || { echo "Invalid request id"; exit 1; }

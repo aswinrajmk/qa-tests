@@ -1,0 +1,21 @@
+name: Smoke suite
+
+# Critical paths on every WealthLite deploy. wealthlite sends `wealthlite-deployed` after each deploy to main.
+on:
+  repository_dispatch:
+    types: [wealthlite-deployed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    uses: ./.github/workflows/qa.yml
+    secrets: inherit
+    with:
+      grep: "@smoke"
+      trigger: ${{ github.event_name == 'repository_dispatch' && 'deploy' || 'manual' }}
+      app_sha: ${{ github.event.client_payload.sha }}
+      app_message: ${{ github.event.client_payload.message }}
+      base_url: ${{ github.event.client_payload.url || 'https://wealthlite.aswin-qa.workers.dev' }}
