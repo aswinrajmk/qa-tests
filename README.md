@@ -65,6 +65,18 @@ Results go to the dashboard only when `RESULTS_API_TOKEN` is set. Without it, th
 | [`qa.yml`](.github/workflows/qa.yml)                       | called by the above, Telegram `/run @KAN-6` | the reporting run          |
 | [`claude-change.yml`](.github/workflows/claude-change.yml) | Telegram change request                     | a PR with the change       |
 
+## From a Jira label to an automated test
+
+| Jira label on a Test issue | Set by                          | Meaning                                           |
+| -------------------------- | ------------------------------- | ------------------------------------------------- |
+| `smoke` / `regression`     | you                             | automate this test in that suite                  |
+| `auto-queued`              | n8n, after your YES in Telegram | sent to qa-tests                                  |
+| `auto-pr-open`             | `automate-from-jira.yml`        | the PR is open (linked in a comment on the story) |
+| `automated`                | `jira-sync.yml` on merge        | the test is in `main`                             |
+| `auto-failed`              | `automate-from-jira.yml`        | the run failed. Remove the label to retry         |
+
+Only labelled Test issues are automated. A story's tests go into one spec and one PR.
+
 ## The self-healing demo
 
 1. In WealthLite, change `SIGN_IN_LABEL` in `src/LoginPage.tsx` from `"Sign in"` to `"Log in"` and push.

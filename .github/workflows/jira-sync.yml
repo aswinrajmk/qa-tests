@@ -1,0 +1,33 @@
+name: Jira sync
+
+# When an automation PR (branch auto/KAN-n) is merged, its Jira Test issues move from auto-pr-open to automated
+# and the story gets a comment with the PR link.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  merged:
+    if: github.event.pull_request.merged && startsWith(github.event.pull_request.head.ref, 'auto/KAN-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      JIRA_SITE: ${{ secrets.JIRA_SITE }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Mark the story's tests automated
+        run: |
+          story="${BRANCH#auto/}"
+          printf '%s' "$story" | grep -Eq '^KAN-[0-9]{1,6}$' || { echo "Unexpected branch $BRANCH"; exit 1; }
+          # Jira scripts use only Node built-ins, so no npm ci is needed.
+          node scripts/jira/transition.ts "$story" merged "$PR_URL"
