@@ -140,7 +140,7 @@ jobs:
           mkdir -p pages/reports && touch pages/.nojekyll
           cp -r playwright-report "pages/reports/$FOLDER"
           verdict=passed; node -e 'const r=require("./test-results/results.json");process.exit(r.stats.unexpected?1:0)' || verdict=failed
-          printf '%s|%s|%s\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "$SUITE" "$verdict" > "pages/reports/$FOLDER/run.txt"
+          printf '%s|%s|%s\n' "$(TZ=Asia/Kolkata date '+%d %b %Y, %H:%M IST')" "$SUITE" "$verdict" > "pages/reports/$FOLDER/run.txt"
           cd pages/reports
           ls -1d */ | sed 's#/##' | sort -t- -k1,1nr | tail -n +$((KEEP + 1)) | xargs -r rm -rf
           {

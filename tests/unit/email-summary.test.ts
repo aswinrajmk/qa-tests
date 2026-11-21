@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { collect, renderEmail, type JsonReport } from "../../scripts/lib/email-summary.ts";
+import { collect, formatIst, renderEmail, type JsonReport } from "../../scripts/lib/email-summary.ts";
 
 const healing = Buffer.from(
   JSON.stringify({
@@ -93,4 +93,9 @@ test("html escapes test output and links the full report", () => {
   assert.ok(html.includes('href="https://aswinrajmk.github.io/qa-tests/reports/1-1/"'));
   assert.ok(html.includes("Healed locators to fix"));
   assert.ok(html.includes("getByRole(&#39;button&#39;") || html.includes("getByRole('button'"));
+});
+
+test("shows the run time in IST", () => {
+  assert.equal(formatIst("2026-11-21T07:00:00.000Z"), "Sat, 21 Nov 2026, 12:30 IST");
+  assert.ok(renderEmail(report, ctx).html.includes("Sat, 21 Nov 2026, 12:30 IST"));
 });
