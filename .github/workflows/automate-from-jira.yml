@@ -1,9 +1,12 @@
 name: Automate Jira tests
 
 # Started by the n8n "Jira Test Automation" workflow after the owner approves, in Telegram, the Test issues of a
-# story that were labelled `smoke` or `regression`. Claude Code writes or updates one spec for the story, the steps
-# below check it and run it against live WealthLite, then open (or update) the PR `auto/<story>` and move the Jira
-# Test issues from auto-queued to auto-pr-open (or auto-failed).
+# story that were labelled `smoke` or `regression`. The owner picks who writes the spec:
+#   engine "claude": Claude Code writes or updates the story's spec here, with the repo's tools and rules.
+#   engine "local":  the local model on the owner's Mac (Ollama) already drafted it; n8n sends it in the payload.
+# The steps below check the spec and run it against live WealthLite, then open (or update) the PR `auto/<story>`
+# and move the Jira Test issues from auto-queued to auto-pr-open (or auto-failed). A local draft that fails the
+# checks still gets a PR, as a draft, so the owner can fix it by hand.
 on:
   repository_dispatch:
     types: [jira-tests-labelled]
@@ -27,6 +30,8 @@ jobs:
     timeout-minutes: 30
     env:
       STORY: ${{ github.event.client_payload.story || inputs.story }}
+      ENGINE: ${{ github.event.client_payload.engine || 'claude' }}
+      LOCAL_MODEL: ${{ github.event.client_payload.model || 'local model' }}
       BOT_URL: https://portfolio.aswin-qa.workers.dev
       BASE_URL: https://wealthlite.aswin-qa.workers.dev
       JIRA_SITE: ${{ secrets.JIRA_SITE }}
@@ -35,7 +40,10 @@ jobs:
       HUSKY: "0"
     steps:
       - name: Validate the story key
-        run: printf '%s' "$STORY" | grep -Eq '^KAN-[0-9]{1,6}$' || { echo "Invalid story key"; exit 1; }
+        run: |
+          printf '%s' "$STORY" | grep -Eq '^KAN-[0-9]{1,6}$' || { echo "Invalid story key"; exit 1; }
+          [ "$ENGINE" = claude ] || [ "$ENGINE" = local ] || { echo "Invalid engine"; exit 1; }
+          printf '%s' "$LOCAL_MODEL" | grep -Eq '^[A-Za-z0-9 .:_-]{1,40}$' || { echo "Invalid model name"; exit 1; }
 
       - uses: actions/checkout@v7
         with:
@@ -73,7 +81,7 @@ jobs:
           cp "$RUNNER_TEMP/jira-story.md" .jira-story.md
 
       - name: Write the tests with Claude Code
-        if: steps.jira.outputs.tests != ''
+        if: steps.jira.outputs.tests != '' && env.ENGINE == 'claude'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -105,6 +113,21 @@ jobs:
             - Finally write `.bot-summary.md` in the repository root: 2 to 4 plain sentences on which tests were added or
               changed, and which ones fail against the live app and why.
 
+      - name: Write the spec drafted by the local model
+        if: steps.jira.outputs.tests != '' && env.ENGINE == 'local'
+        env:
+          # Passed through the environment, never interpolated into the script.
+          SPEC: ${{ github.event.client_payload.spec }}
+          FEATURE: ${{ github.event.client_payload.feature }}
+          TESTS: ${{ steps.jira.outputs.tests }}
+        run: |
+          node scripts/jira/write-local-spec.ts "$STORY"
+          # Tidy what a small model gets wrong most often; the checks below judge the rest.
+          npx eslint --fix "tests/ui/**/*.spec.ts" >/dev/null 2>&1 || true
+          npx prettier --write tests >/dev/null 2>&1 || true
+          rm -f .jira-story.md
+          echo "Drafted in one pass by the local model ($LOCAL_MODEL) on the owner's Mac, for Test issues ${TESTS//,/, }. Review it closely: a small model often needs a hand fix." > .bot-summary.md
+
       - name: Check the result
         id: result
         if: steps.jira.outputs.tests != ''
@@ -124,8 +147,11 @@ jobs:
           echo "status=changed" >> "$GITHUB_OUTPUT"
 
       - name: Run the checks (lint, types, unit tests, tag traceability)
+        id: verify
         if: steps.result.outputs.status == 'changed'
-        run: npm run verify
+        # A local draft that fails still becomes a draft PR to fix by hand; a Claude run must pass.
+        continue-on-error: ${{ env.ENGINE == 'local' }}
+        run: npm run verify 2>&1 | tee "$RUNNER_TEMP/verify.log"
 
       - name: Run the story's tests against live WealthLite
         id: tests
@@ -134,7 +160,8 @@ jobs:
           # RESULTS_API_TOKEN is not set here, so drafts never reach the public dashboard.
           npx playwright test --grep "@$STORY" --reporter=json > "$RUNNER_TEMP/results.json" || true
           node -e '
-            const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            let r = { stats: { expected: 0, flaky: 0, unexpected: 0 } };
+            try { r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch {}
             console.log(`passed=${r.stats.expected + r.stats.flaky}`);
             console.log(`failed=${r.stats.unexpected}`);
           ' "$RUNNER_TEMP/results.json" >> "$GITHUB_OUTPUT"
@@ -150,12 +177,17 @@ jobs:
           EXISTING: ${{ steps.branch.outputs.existing }}
           PASSED: ${{ steps.tests.outputs.passed }}
           FAILED: ${{ steps.tests.outputs.failed }}
+          VERIFY: ${{ steps.verify.outcome }}
         run: |
           title="test($STORY): automate $(printf '%s' "$TITLE" | cut -c1-55)"
+          author="Claude Code in GitHub Actions"
+          [ "$ENGINE" = local ] && author="the local model ($LOCAL_MODEL) on the owner's Mac"
+          draft=""
+          [ "$VERIFY" = failure ] && draft="--draft"
           git config user.name "aswin-qa-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -q -m "$title" -m "Jira Test issues: ${TESTS//,/, }."
+          git commit -q -m "$title" -m "Jira Test issues: ${TESTS//,/, }. Written by $author."
           if [ -n "$EXISTING" ]; then
             git push -q origin "$BRANCH"
             echo "number=$EXISTING" >> "$GITHUB_OUTPUT"
@@ -176,7 +208,15 @@ jobs:
             echo
             echo "## Evidence"
             echo
-            echo "- \`npm run verify\` passed in the workflow."
+            if [ "$VERIFY" = failure ]; then
+              echo "- ⚠️ \`npm run verify\` **failed**, so this PR is a draft. Fix the spec, then mark it ready. Last lines:"
+              echo
+              echo '```'
+              tail -n 25 "$RUNNER_TEMP/verify.log"
+              echo '```'
+            else
+              echo "- \`npm run verify\` passed in the workflow."
+            fi
             echo "- Against live WealthLite: $PASSED passed, $FAILED failed. Failing tests are expected until the app implements the story."
             echo
             echo "## What changed"
@@ -184,9 +224,9 @@ jobs:
             cat "$RUNNER_TEMP/summary.txt"
             echo
             echo
-            echo "Written by Claude Code in GitHub Actions. On merge, jira-sync.yml labels the Test issues \`automated\`."
+            echo "Written by $author. On merge, jira-sync.yml labels the Test issues \`automated\`."
           } > "$RUNNER_TEMP/body.md"
-          url=$(gh pr create --base main --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md")
+          url=$(gh pr create --base main --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md" $draft)
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "number=${url##*/}" >> "$GITHUB_OUTPUT"
           echo "status=pr_opened" >> "$GITHUB_OUTPUT"

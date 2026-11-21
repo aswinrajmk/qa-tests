@@ -9,7 +9,7 @@ Jira Story (KAN) ──n8n intake──▶ approved Test issues (linked "is test
                  │
            n8n "Jira Test Automation" ── Telegram approve ──▶ repository_dispatch: jira-tests-labelled {story}
                  │
-           automate-from-jira.yml: fetch story + labelled tests ▶ Claude Code writes specs ▶ lint, types,
+           automate-from-jira.yml: fetch story + labelled tests ▶ Claude Code (or the local model's draft) ▶ lint, types,
            tag check, run against live app ▶ PR auto/KAN-n ▶ Jira comment + label auto-pr-open
                  │
            merge ▶ jira-sync.yml labels the tests "automated"

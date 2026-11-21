@@ -19,7 +19,7 @@ const TRANSITIONS = {
   failed: {
     from: "auto-queued",
     to: "auto-failed",
-    say: "Automating the tests failed. Remove the auto-failed label on a Test issue to retry. Log: ",
+    say: "Automating the tests failed. Remove the auto-failed label on a Test issue to retry, and pick Claude or the local model in Telegram. Log: ",
   },
   merged: { from: "auto-pr-open", to: "automated", say: "Automated tests merged into qa-tests: " },
 } as const;
