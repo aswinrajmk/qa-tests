@@ -19,3 +19,28 @@ export function extractCode(reply: string): string {
   if (code.length > 30_000) throw new Error("The local model's reply is too long to be a single spec");
   return code + "\n";
 }
+
+/**
+ * Drops fixtures a test destructures but never uses (`async ({ signedIn, loginPage }) =>`), the lint error small
+ * models make most. Each test is checked against its own body, up to the next test or the end of the file.
+ */
+export function dropUnusedFixtures(code: string): string {
+  const head = /async\s*\(\{([^}]*)\}\)\s*=>\s*\{/g;
+  const matches = [...code.matchAll(head)];
+  let out = "";
+  let last = 0;
+  matches.forEach((m, i) => {
+    const start = m.index ?? 0;
+    const bodyEnd = matches[i + 1]?.index ?? code.length;
+    const body = code.slice(start + m[0].length, bodyEnd);
+    const names = (m[1] ?? "")
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
+    const used = names.filter((n) => new RegExp(`\\b${n}\\b`).test(body));
+    out +=
+      code.slice(last, start) + m[0].replace(m[1] ?? "", ` ${(used.length ? used : names.slice(0, 1)).join(", ")} `);
+    last = start + m[0].length;
+  });
+  return out + code.slice(last);
+}

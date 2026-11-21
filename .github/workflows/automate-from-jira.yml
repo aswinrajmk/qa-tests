@@ -184,6 +184,8 @@ jobs:
           [ "$ENGINE" = local ] && author="the local model ($LOCAL_MODEL) on the owner's Mac"
           draft=""
           [ "$VERIFY" = failure ] && draft="--draft"
+          # A local draft whose tests fail on the live app is unfinished work, not a test-first spec.
+          [ "$ENGINE" = local ] && [ "${FAILED:-0}" != 0 ] && draft="--draft"
           git config user.name "aswin-qa-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
@@ -208,6 +210,9 @@ jobs:
             echo
             echo "## Evidence"
             echo
+            if [ "$ENGINE" = local ] && [ -n "$draft" ]; then
+              echo "- ⚠️ This draft from the local model needs a hand fix before it is ready, so the PR is a draft."
+            fi
             if [ "$VERIFY" = failure ]; then
               echo "- ⚠️ \`npm run verify\` **failed**, so this PR is a draft. Fix the spec, then mark it ready. Last lines:"
               echo

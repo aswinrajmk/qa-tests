@@ -4,12 +4,12 @@
 
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { extractCode, specPath } from "../lib/local-spec.ts";
+import { dropUnusedFixtures, extractCode, specPath } from "../lib/local-spec.ts";
 
 const story = process.argv[2] ?? "";
 const firstTest = (process.env.TESTS ?? "").split(",")[0] ?? "";
 const path = specPath(story, firstTest, process.env.FEATURE ?? "");
-const code = extractCode(process.env.SPEC ?? "");
+const code = dropUnusedFixtures(extractCode(process.env.SPEC ?? ""));
 
 mkdirSync(dirname(path), { recursive: true });
 writeFileSync(path, code);
