@@ -22,4 +22,28 @@ test.describe("Sign out from the portfolio page", { tag: "@KAN-6" }, () => {
       });
     },
   );
+
+  test(
+    "sends a signed-out visitor who opens the portfolio URL to the login page",
+    { tag: ["@KAN-7", "@smoke"] },
+    async ({ signedIn, portfolioPage, loginPage }) => {
+      await test.step("Sign out from the portfolio page", async () => {
+        await signedIn.header.signOut();
+        await expect(signedIn.page).toHaveURL(/\/login$/);
+      });
+
+      await test.step("Open the portfolio route directly in the address bar", () => portfolioPage.goto());
+
+      await test.step("A login prompt appears instead of the portfolio", async () => {
+        await expect(portfolioPage.page).toHaveURL(/\/login$/);
+        await expect(loginPage.heading()).toHaveText("Sign in to your portfolio");
+        await expect(loginPage.email()).toBeVisible();
+      });
+
+      await test.step("No holdings data is shown", async () => {
+        await expect(portfolioPage.holdings.root).toBeHidden();
+        await expect(portfolioPage.totalValue()).toBeHidden();
+      });
+    },
+  );
 });
