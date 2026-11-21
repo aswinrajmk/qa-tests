@@ -11,6 +11,9 @@ permissions:
 
 jobs:
   smoke:
+    # qa.yml pushes the HTML report to gh-pages; a called workflow cannot get more access than its caller grants.
+    permissions:
+      contents: write
     uses: ./.github/workflows/qa.yml
     secrets: inherit
     with:
