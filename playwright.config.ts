@@ -18,7 +18,8 @@ export default defineConfig({
     ["list"],
     ["html", { open: "never" }],
     ["./src/reporters/results-api.ts"],
-    ...(env.isCI ? ([["github"]] as const) : []),
+    // In CI: annotations on the run, and JSON for the run email (scripts/report/email-summary.ts).
+    ...(env.isCI ? ([["github"], ["json", { outputFile: "test-results/results.json" }]] as const) : []),
   ],
   use: {
     baseURL: env.baseUrl,

@@ -65,6 +65,19 @@ Results go to the dashboard only when `RESULTS_API_TOKEN` is set. Without it, th
 | [`qa.yml`](.github/workflows/qa.yml)                       | called by the above, Telegram `/run @KAN-6` | the reporting run          |
 | [`claude-change.yml`](.github/workflows/claude-change.yml) | Telegram change request                     | a PR with the change       |
 
+### Run reports by email
+
+After every smoke and regression run, CI:
+
+- publishes the full interactive Playwright report to **https://aswinrajmk.github.io/qa-tests/reports/**
+  (newest 30 runs)
+- emails a readable summary to the owner, with the verdict, counts, failed tests with their errors, healed
+  locators with suggested fixes, every test grouped by Jira story, and links to the full report, the dashboard
+  and the CI log
+
+Partial runs (Telegram `/run @KAN-6`) aren't emailed. Mail goes through Gmail SMTP using the secrets
+`MAIL_USERNAME` and `MAIL_APP_PASSWORD` (a Google app password). Without them, CI only warns.
+
 ## From a Jira label to an automated test
 
 | Jira label on a Test issue | Set by                          | Meaning                                           |
