@@ -109,6 +109,19 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const COLOR: Record<Outcome, string> = { passed: "#1a7f37", failed: "#cf222e", healed: "#9a6700", skipped: "#57606a" };
 const ICON: Record<Outcome, string> = { passed: "✅", failed: "❌", healed: "🩹", skipped: "⏭" };
 
+// Times in the email are India Standard Time, like the dashboard. Intl names the zone "GMT+5:30", so the label is
+// added by hand.
+const IST = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Asia/Kolkata",
+});
+export const formatIst = (iso: string) => `${IST.format(new Date(iso))} IST`;
+
 const seconds = (ms: number) => (ms < 60_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60_000)} min`);
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -176,7 +189,7 @@ export function renderEmail(report: JsonReport, ctx: RunContext): { subject: str
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#24292f;text-align:left">
 <tr><td>
   <h1 style="font-size:20px;margin:0 0 4px">${failed ? "❌" : "✅"} ${esc(cap(ctx.suite))} suite ${verdict}: ${ok}/${ran}</h1>
-  <p style="margin:0 0 16px;color:#57606a;font-size:14px">${esc(ctx.app)}${sha ? ` at <code>${esc(sha)}</code>` : ""}${ctx.appMessage ? ` · ${esc(ctx.appMessage.split("\n")[0] ?? "")}` : ""} · ${seconds(report.stats.duration)} · ${esc(new Date(report.stats.startTime).toUTCString())}</p>
+  <p style="margin:0 0 16px;color:#57606a;font-size:14px">${esc(ctx.app)}${sha ? ` at <code>${esc(sha)}</code>` : ""}${ctx.appMessage ? ` · ${esc(ctx.appMessage.split("\n")[0] ?? "")}` : ""} · ${seconds(report.stats.duration)} · ${esc(formatIst(report.stats.startTime))}</p>
   <table role="presentation" width="100%" cellspacing="6" cellpadding="0"><tr>
     ${tile("Passed", count("passed"), "passed")}${tile("Failed", failed, "failed")}${tile("Healed", count("healed"), "healed")}${tile("Skipped", count("skipped"), "skipped")}
   </tr></table>
