@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { areSynonyms, bestMatch, dice, similarity, suggestLocator } from "../../src/healing/similarity.ts";
+import { areSynonyms, bestMatch, dice, similarity, suggestLocator } from "../../src/core/healing/similarity.ts";
 
 test("treats sign in / log in as the same action", () => {
   assert.equal(areSynonyms("Sign in", "Log in"), true);

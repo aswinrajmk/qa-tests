@@ -1,9 +1,27 @@
 name: QA suite
 
+# The one place that runs Playwright against WealthLite and streams results to the QA dashboard.
+# smoke.yml and regression.yml call it with a tag filter. The Telegram bot dispatches it by name
+# (`/run @KAN-6`), so keep the file name.
 on:
-  # Sent by wealthlite after every deploy to main.
-  repository_dispatch:
-    types: [wealthlite-deployed]
+  workflow_call:
+    inputs:
+      grep:
+        type: string
+        default: ""
+      trigger:
+        description: deploy or manual (shown on the dashboard)
+        type: string
+        default: manual
+      app_sha:
+        type: string
+        default: ""
+      app_message:
+        type: string
+        default: ""
+      base_url:
+        type: string
+        default: https://wealthlite.aswin-qa.workers.dev
   workflow_dispatch:
     inputs:
       base_url:
@@ -11,14 +29,9 @@ on:
         required: false
         default: https://wealthlite.aswin-qa.workers.dev
       grep:
-        description: Only run tests matching this pattern (for example @REQ-3). Empty runs everything.
+        description: Only run tests matching this pattern (@smoke, @KAN-6, ...). Empty runs everything.
         required: false
         default: ""
-
-# Runs queue instead of cancelling each other, so every deploy gets a report.
-concurrency:
-  group: qa-suite
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -26,12 +39,18 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Runs queue instead of cancelling each other, so every deploy gets a report. Job level, so it also
+    # applies when smoke.yml or regression.yml call this workflow.
+    concurrency:
+      group: qa-suite
+      cancel-in-progress: false
     timeout-minutes: 15
     env:
-      BASE_URL: ${{ github.event.client_payload.url || inputs.base_url || 'https://wealthlite.aswin-qa.workers.dev' }}
+      BASE_URL: ${{ inputs.base_url || 'https://wealthlite.aswin-qa.workers.dev' }}
       RESULTS_API_TOKEN: ${{ secrets.RESULTS_API_TOKEN }}
       CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       QA_FILTER: ${{ inputs.grep }}
+      HUSKY: "0"
     steps:
       - name: Validate the filter
         run: |
@@ -50,27 +69,26 @@ jobs:
 
       - name: Describe what is being tested
         env:
-          EVENT: ${{ github.event_name }}
-          PAYLOAD_SHA: ${{ github.event.client_payload.sha }}
-          PAYLOAD_MESSAGE: ${{ github.event.client_payload.message }}
+          TRIGGER: ${{ inputs.trigger || 'manual' }}
+          PAYLOAD_SHA: ${{ inputs.app_sha }}
+          PAYLOAD_MESSAGE: ${{ inputs.app_message }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$EVENT" = "repository_dispatch" ]; then
-            sha="$PAYLOAD_SHA"; message="$PAYLOAD_MESSAGE"; trigger=deploy
+          if [ -n "$PAYLOAD_SHA" ]; then
+            sha="$PAYLOAD_SHA"; message="$PAYLOAD_MESSAGE"
           else
-            # Manual run: report against the latest wealthlite commit on main.
+            # No commit given: report against the latest wealthlite commit on main.
             sha=$(gh api repos/aswinrajmk/wealthlite/commits/main --jq .sha)
             message=$(gh api repos/aswinrajmk/wealthlite/commits/main --jq '.commit.message' | head -n 1)
-            trigger=manual
           fi
           {
-            echo "QA_TRIGGER=$trigger"
+            echo "QA_TRIGGER=$TRIGGER"
             echo "APP_COMMIT_SHA=$sha"
             echo "APP_COMMIT_MESSAGE<<__EOF__"
             printf '%s\n' "${message:0:300}"
             echo "__EOF__"
           } >> "$GITHUB_ENV"
-          echo "Testing $BASE_URL at ${sha::7} ($trigger)${QA_FILTER:+, only tests matching $QA_FILTER}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Testing $BASE_URL at ${sha::7} ($TRIGGER)${QA_FILTER:+, only tests matching $QA_FILTER}" >> "$GITHUB_STEP_SUMMARY"
 
       - run: npm run test:unit
       - run: npx playwright install --with-deps chromium

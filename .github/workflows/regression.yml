@@ -1,0 +1,17 @@
+name: Regression suite
+
+# Everything tagged @smoke or @regression, nightly and on demand. Smoke is a subset of regression.
+on:
+  schedule:
+    - cron: "0 2 * * *" # 02:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    uses: ./.github/workflows/qa.yml
+    secrets: inherit
+    with:
+      grep: "@smoke|@regression"

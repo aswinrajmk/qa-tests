@@ -1,0 +1,4 @@
+# Every change needs the owner's review. Framework internals and CI are called out so they can be split later.
+*                   @aswinrajmk
+/src/core/          @aswinrajmk
+/.github/           @aswinrajmk

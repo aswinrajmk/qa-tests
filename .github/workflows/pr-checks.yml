@@ -1,0 +1,30 @@
+name: PR checks
+
+# Fast gates on every pull request. No network or browser needed: tests are listed, not run.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HUSKY: "0"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint and format
+        run: npm run lint
+      - name: Type-check
+        run: npm run typecheck
+      - name: Unit tests (healing, tag rules)
+        run: npm run test:unit
+      - name: Traceability (every test has a story, a Test issue and a suite)
+        run: npm run check:tags

@@ -15,5 +15,5 @@
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "reporters", "playwright.config.ts"]
+  "include": ["config", "src", "tests", "scripts", "playwright.config.ts"]
 }

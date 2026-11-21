@@ -139,7 +139,7 @@ export default class ResultsApiReporter implements Reporter {
       steps: flattenSteps(result.steps).slice(0, 100),
       healing: status === "healed" ? healing : undefined,
       logs: logs.length ? logs : undefined,
-      // Requirement tags (@REQ-n) link the result to a requirement on the dashboard.
+      // Jira tags (@KAN-n: story and Test issue) link the result to a story on the dashboard.
       tags: test.tags.length ? test.tags.slice(0, 20) : undefined,
       screenshot,
     };

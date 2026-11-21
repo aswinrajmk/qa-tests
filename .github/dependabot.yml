@@ -1,0 +1,11 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      playwright: { patterns: ["@playwright/*", "playwright*", "@axe-core/*"] }
+      lint: { patterns: ["eslint*", "@eslint/*", "typescript-eslint", "prettier", "@commitlint/*"] }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
