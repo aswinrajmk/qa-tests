@@ -11,8 +11,9 @@ test.describe("Sort holdings by value", { tag: "@KAN-26" }, () => {
       await test.step("Locate the 'Value' column header", async () => {
         await expect(signedIn.holdings.root).toBeVisible();
         await expect(signedIn.holdings.valueHeader()).toBeVisible();
+        await expect(signedIn.holdings.valueSortArrows()).toBeVisible();
         unsorted = await signedIn.holdings.valueTexts();
-        expect(unsorted.length).toBeGreaterThan(1);
+        expect(unsorted.length, "holdings available to sort").toBeGreaterThan(1);
       });
 
       await test.step("Click the down arrow icon next to 'Value'", () => signedIn.holdings.sortByValue("descending"));
@@ -23,6 +24,7 @@ test.describe("Sort holdings by value", { tag: "@KAN-26" }, () => {
 
       await test.step("The remaining rows follow in descending order of value", async () => {
         await expect(signedIn.holdings.values()).toHaveText([...unsorted].sort(byGbpDescending));
+        await signedIn.holdings.expectSortedByValue("descending");
       });
     },
   );
@@ -36,8 +38,9 @@ test.describe("Sort holdings by value", { tag: "@KAN-26" }, () => {
       await test.step("Locate the 'Value' column header", async () => {
         await expect(signedIn.holdings.root).toBeVisible();
         await expect(signedIn.holdings.valueHeader()).toBeVisible();
+        await expect(signedIn.holdings.valueSortArrows()).toBeVisible();
         unsorted = await signedIn.holdings.valueTexts();
-        expect(unsorted.length).toBeGreaterThan(1);
+        expect(unsorted.length, "holdings available to sort").toBeGreaterThan(1);
       });
 
       await test.step("Click the up arrow icon next to 'Value'", () => signedIn.holdings.sortByValue("ascending"));
@@ -48,6 +51,7 @@ test.describe("Sort holdings by value", { tag: "@KAN-26" }, () => {
 
       await test.step("The remaining rows follow in ascending order of value", async () => {
         await expect(signedIn.holdings.values()).toHaveText([...unsorted].sort(byGbpAscending));
+        await signedIn.holdings.expectSortedByValue("ascending");
       });
     },
   );

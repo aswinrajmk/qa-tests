@@ -1,8 +1,7 @@
-import type { Locator } from "@playwright/test";
+import { expect, type Locator } from "@playwright/test";
 import type { Healer } from "../core/healing/heal.ts";
-import { parseGbp } from "../data/money.ts";
 
-/** Direction the "Value" column can be sorted in, matching the aria-sort values a sortable table uses. */
+/** Direction the "Value" column can be sorted in, matching the `aria-sort` values the header reports. */
 export type SortDirection = "ascending" | "descending";
 
 /** The "Your holdings" table. A component takes its root locator, so it works wherever the table is placed. */
@@ -19,37 +18,56 @@ export class HoldingsTable {
   /** The "Value" column header cell, which carries the sort arrows and the current sort state. */
   readonly valueHeader = () => this.root.getByRole("columnheader", { name: "Value" });
 
+  /** The up and down arrows shown next to the "Value" label. Decorative, so they have no accessible name. */
+  readonly valueSortArrows = () => this.valueHeader().locator(".sort__arrows");
+
   /** The money amounts as the UI formats them, in the order the rows are shown. */
   valueTexts(): Promise<string[]> {
     return this.values().allInnerTexts();
   }
 
-  /** The money amounts in pence, in the order the rows are shown. */
-  async valuesInPence(): Promise<number[]> {
-    return (await this.valueTexts()).map(parseGbp);
+  /**
+   * Sorts the table by "Value" with the header's arrow control.
+   *
+   * The up and down arrows are one toggle: each activation advances the column to the next sort state,
+   * so reaching a given direction takes one or two clicks depending on where the column starts.
+   */
+  async sortByValue(direction: SortDirection): Promise<void> {
+    const control = await this.valueSortControl();
+    const header = this.valueHeader();
+
+    for (let click = 0; click < 2; click++) {
+      const before = (await header.getAttribute("aria-sort")) ?? "none";
+      await control.click();
+      await expect(header, "the Value column to change sort state when its arrow is clicked").not.toHaveAttribute(
+        "aria-sort",
+        before,
+      );
+      if ((await header.getAttribute("aria-sort")) === direction) return;
+    }
+
+    // Not reached in a healthy app: fails with the direction the column ended up in.
+    await expect(header).toHaveAttribute("aria-sort", direction);
   }
 
-  /** Clicks the up or down arrow next to "Value" to sort the table by that column. */
-  async sortByValue(direction: SortDirection): Promise<void> {
-    const arrow = await this.valueSortArrow(direction);
-    await arrow.click();
+  /** Asserts the "Value" column reports the given sort direction, which is what its arrows indicate. */
+  expectSortedByValue(direction: SortDirection): Promise<void> {
+    return expect(this.valueHeader()).toHaveAttribute("aria-sort", direction);
   }
 
   /**
-   * The arrow control that sorts "Value" one way. The arrows are new UI whose labels are likely to be
-   * reworded, so they go through the healer with a test id fallback.
+   * The control that sorts "Value". Its accessible name carries the current sort state ("Value, not sorted"),
+   * so it is matched on the stable "Value" part through the healer, with a test id fallback.
    */
-  private valueSortArrow(direction: SortDirection): Promise<Locator> {
-    const name = direction === "descending" ? "Sort by value descending" : "Sort by value ascending";
-    const testId = direction === "descending" ? "sort-value-desc" : "sort-value-asc";
+  private valueSortControl(): Promise<Locator> {
     return this.heal.locate({
-      element: `Value column ${direction} sort arrow`,
+      element: "Value column sort arrows",
       primary: {
-        description: `getByRole('button', { name: '${name}' })`,
-        locate: () => this.valueHeader().getByRole("button", { name }),
+        description: "getByRole('button', { name: 'Value' })",
+        locate: () => this.valueHeader().getByRole("button", { name: "Value" }),
       },
-      fallbacks: [{ description: `getByTestId('${testId}')`, locate: (p) => p.getByTestId(testId) }],
-      label: { text: name, role: "button" },
+      fallbacks: [{ description: "getByTestId('sort-value')", locate: (p) => p.getByTestId("sort-value") }],
+      label: { text: "Value", role: "button" },
     });
   }
 }
