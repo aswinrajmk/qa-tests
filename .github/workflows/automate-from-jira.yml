@@ -191,6 +191,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -q -m "$title" -m "Jira Test issues: ${TESTS//,/, }. Written by $author."
+          # The PR found at the start may have been merged while this run worked (KAN-26). Pushing to it then would
+          # strand this commit on a merged branch, so open a new PR for it instead.
+          if [ -n "$EXISTING" ] && [ "$(gh pr view "$EXISTING" --json state --jq .state)" != OPEN ]; then
+            echo "::warning::PR #$EXISTING was closed or merged during this run, so the changes go into a new PR."
+            EXISTING=""
+          fi
           if [ -n "$EXISTING" ]; then
             git push -q origin "$BRANCH"
             echo "number=$EXISTING" >> "$GITHUB_OUTPUT"
@@ -244,8 +250,13 @@ jobs:
           RESULT: ${{ steps.result.outputs.status }}
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
         run: |
-          if [ -n "$PR_URL" ]; then node scripts/jira/transition.ts "$STORY" pr-open "$PR_URL"
+          # A PR merged before this step must not move its tests back to auto-pr-open; jira-sync.yml may already
+          # have run. `merged` accepts auto-queued too, so either order ends at automated.
+          if [ -n "$PR_URL" ] && [ "$(gh pr view "$PR_URL" --json state --jq .state)" = MERGED ]; then
+            node scripts/jira/transition.ts "$STORY" merged "$PR_URL"
+          elif [ -n "$PR_URL" ]; then node scripts/jira/transition.ts "$STORY" pr-open "$PR_URL"
           elif [ "$RESULT" = "no_changes" ] && [ "$JOB_STATUS" = "success" ]; then
             node scripts/jira/transition.ts "$STORY" unchanged "$RUN_URL"
           else node scripts/jira/transition.ts "$STORY" failed "$RUN_URL"; fi
