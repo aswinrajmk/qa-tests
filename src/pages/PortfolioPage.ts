@@ -12,7 +12,7 @@ export class PortfolioPage extends BasePage {
   constructor(page: Page, heal: Healer) {
     super(page, heal);
     this.header = new AppHeader(heal);
-    this.holdings = new HoldingsTable(page.getByRole("table", { name: "Your holdings" }));
+    this.holdings = new HoldingsTable(page.getByRole("table", { name: "Your holdings" }), heal);
   }
 
   readonly greeting = () => this.page.getByRole("heading", { level: 1 });
