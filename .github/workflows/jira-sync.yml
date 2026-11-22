@@ -1,7 +1,8 @@
 name: Jira sync
 
-# When an automation PR (branch auto/KAN-n) is merged, its Jira Test issues move from auto-pr-open to automated
-# and the story gets a comment with the PR link.
+# When an automation PR (branch auto/KAN-n) is merged, its Jira Test issues move to automated and the story gets a
+# comment with the PR link. They move from auto-pr-open, or from auto-queued if a later run for the story was still in
+# flight. The job fails if no Test issue moved, so Jira never silently lags behind main.
 on:
   pull_request:
     types: [closed]
